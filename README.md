@@ -83,15 +83,26 @@ The repository includes two automated GitHub Actions workflows:
 
 ---
 
-## Customizing for Your Application
+## Using as a Template
 
-To adapt this template for your own project:
+To use this repository as a template to build an RPM installer for your own shell scripts or applications:
 
-1. **Set Version**: Update `VERSION` with your initial semver (e.g., `0.1.0`).
-2. **Add Sources**: Replace files in `src/` with your application code, configs, or systemd units.
-3. **Configure Spec**: Update `packaging/rpm/*.spec` with your package `Name:`, `Summary:`, and installation paths under `%install` and `%files`.
-4. **Update Builder**: Update `ARG NAME=your-package-name` in `docker/Dockerfile.builder`.
-5. **Update Test Runner**: Update the binary name and assertions in `scripts/test-lifecycle.sh` and `scripts/test-lifecycle.ps1`.
+1. Click [**Use this template**](https://github.com/new?template_name=azurelinux-rpm-starter&template_owner=mayankpadshala) > **Create a new repository** on GitHub.
+2. Update the following files to configure your package:
+
+| File | What to Change | Description |
+| :--- | :--- | :--- |
+| [`VERSION`](VERSION) | Version string | Set initial semver (e.g., `0.1.0` or `1.0.0`) |
+| `packaging/rpm/*.spec` | Rename & edit spec | Rename to `<name>.spec`. Set `Name:`, `Summary:`, dependencies (`Requires:`), and install paths in `%install` / `%files` |
+| [`src/`](src/) | Replace payload | Place your shell scripts, binaries, or config files here |
+| [`docker/Dockerfile.builder`](docker/Dockerfile.builder) | `ARG NAME=...` | Set package name to match your spec file |
+| `scripts/build.sh` & `.ps1` | `NAME="..."` | Set your package name |
+| `scripts/test-lifecycle.sh` & `.ps1` | `NAME="..."` | Set your package name and update CLI verification assertions |
+
+3. Test locally with `./scripts/build.sh` and `./scripts/test-lifecycle.sh` (or `make build` / `make test`).
+4. Commit and push:
+   - PRs automatically run the 5-stage lifecycle tests via `pre-merge.yml`.
+   - Merging with a bumped `VERSION` automatically publishes a GitHub Release with pre-built RPMs via `post-merge.yml`.
 
 ---
 
