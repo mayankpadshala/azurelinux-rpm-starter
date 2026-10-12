@@ -1,0 +1,29 @@
+# ─────────────────────────────────────────────────────────────────────
+# Dockerfile.tester — Clean Azure Linux 3.0 image for lifecycle tests
+# ─────────────────────────────────────────────────────────────────────
+#
+# Purpose:
+#   Provides a minimal, pristine Azure Linux 3.0 environment that
+#   mirrors a fresh production VM. The lifecycle test scripts
+#   (scripts/test-lifecycle.sh and scripts/test-lifecycle.ps1) launch
+#   this image as an ephemeral container (docker run --rm) and mount
+#   the built RPMs at /rpms to validate install → upgrade → uninstall.
+#
+# Why a separate image from the builder?
+#   The builder image has rpm-build and other development tools
+#   installed, which is not representative of a production target.
+#   This image is intentionally kept minimal so that dependency
+#   issues or missing runtime requirements are caught during testing.
+#
+# Usage:
+#   docker run --rm -v "$(pwd)/dist:/rpms:ro" hello-azurelinux-tester \
+#       /bin/bash -c "tdnf install -y /rpms/hello-azurelinux-*.rpm && ..."
+# ─────────────────────────────────────────────────────────────────────
+
+# Base image: Azure Linux 3.0 (formerly CBL-Mariner)
+FROM mcr.microsoft.com/azurelinux/base/core:3.0
+
+# Pre-populate the package metadata cache so that tdnf install/upgrade
+# commands during testing don't need to download repo metadata first.
+# This speeds up test runs and avoids transient network failures.
+RUN tdnf makecache

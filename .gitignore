@@ -1,0 +1,11 @@
+# Built package distribution directory
+dist/
+
+# macOS metadata
+.DS_Store
+
+# Temporary editor / IDE files
+.vscode/
+.idea/
+*.swp
+*~
