@@ -28,48 +28,62 @@ jobs:
       - name: Set script permissions
         run: chmod +x scripts/*.sh
 
-      - name: Extract package version
-        id: version
+      - name: Read VERSION file and check for version update
+        id: version_check
         run: |
-          VERSION=$(cat VERSION | tr -d '[:space:]')
-          echo "PACKAGE_VERSION=${VERSION}" >> "$GITHUB_ENV"
-          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Building package version: ${VERSION}"
+          # 1. Read current version directly from the VERSION file in the repo root
+          VERSION_FILE="./VERSION"
+          if [ ! -f "$VERSION_FILE" ]; then
+            echo "ERROR: File $VERSION_FILE does not exist!" >&2
+            exit 1
+          fi
 
-      - name: Check if VERSION was updated
-        id: check_version
-        run: |
-          BEFORE="${{ github.event.before }}"
-          NEW_VERSION="${{ env.PACKAGE_VERSION }}"
-          FORCE_RELEASE="${{ inputs.force_release }}"
+          CURRENT_VERSION=$(cat "$VERSION_FILE" | tr -d '[:space:]')
+          echo "Current package version from $VERSION_FILE: '${CURRENT_VERSION}'"
+          echo "PACKAGE_VERSION=${CURRENT_VERSION}" >> "$GITHUB_ENV"
+          echo "version=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
 
-          if [ "$FORCE_RELEASE" = "true" ]; then
-            echo "Force release requested via manual dispatch."
-            echo "updated=true" >> "$GITHUB_OUTPUT"
+          # 2. Check for manual force-release input
+          if [ "${{ inputs.force_release }}" = "true" ]; then
+            echo "Manual force_release flag is set. Proceeding with release."
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
+          # 3. Determine the base commit on main before this merge
+          BEFORE="${{ github.event.before }}"
           if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            OLD_VERSION=$(git show "${BEFORE}:VERSION" 2>/dev/null | tr -d '[:space:]' || echo "")
+            BASE_COMMIT="$BEFORE"
           elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-            OLD_VERSION=$(git show HEAD~1:VERSION 2>/dev/null | tr -d '[:space:]' || echo "")
+            BASE_COMMIT="HEAD~1"
           else
-            OLD_VERSION=""
+            BASE_COMMIT=""
           fi
 
-          echo "Previous version: '${OLD_VERSION}'"
-          echo "Current version:  '${NEW_VERSION}'"
-
-          if [ -n "$OLD_VERSION" ] && [ "$OLD_VERSION" != "$NEW_VERSION" ]; then
-            echo "✓ VERSION was updated from ${OLD_VERSION} to ${NEW_VERSION} in this merge."
-            echo "updated=true" >> "$GITHUB_OUTPUT"
+          # 4. Check if the VERSION file changed in git between base commit and HEAD
+          if [ -n "$BASE_COMMIT" ]; then
+            PREVIOUS_VERSION=$(git show "${BASE_COMMIT}:VERSION" 2>/dev/null | tr -d '[:space:]' || echo "")
+            HAS_VERSION_DIFF=$(git diff --name-only "$BASE_COMMIT" HEAD -- VERSION)
           else
-            echo "ℹ VERSION was not updated in this merge. Artifact will be saved, but GitHub Release will be skipped."
-            echo "updated=false" >> "$GITHUB_OUTPUT"
+            PREVIOUS_VERSION=""
+            HAS_VERSION_DIFF=""
+          fi
+
+          echo "Base commit:               ${BASE_COMMIT:-none}"
+          echo "Previous version in git:   '${PREVIOUS_VERSION}'"
+          echo "Current version in $VERSION_FILE: '${CURRENT_VERSION}'"
+
+          if [ -n "$HAS_VERSION_DIFF" ] && [ -n "$PREVIOUS_VERSION" ] && [ "$PREVIOUS_VERSION" != "$CURRENT_VERSION" ]; then
+            echo "✓ The $VERSION_FILE file was modified in this merge (${PREVIOUS_VERSION} -> ${CURRENT_VERSION})."
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ℹ The $VERSION_FILE file was NOT modified in this merge."
+            echo "  A workflow artifact will be created, but no GitHub Release will be published."
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build RPM package
-        run: ./scripts/build.sh "${{ env.PACKAGE_VERSION }}"
+        run: ./scripts/build.sh "${{ steps.version_check.outputs.version }}"
 
       - name: Generate SHA256 checksums
         run: |
@@ -80,12 +94,12 @@ jobs:
       - name: Upload built RPMs as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: azurelinux-rpm-v${{ env.PACKAGE_VERSION }}
+          name: azurelinux-rpm-v${{ steps.version_check.outputs.version }}
           path: dist/*
           retention-days: 90
 
       - name: Publish to GitHub Release
-        if: steps.check_version.outputs.updated == 'true'
+        if: steps.version_check.outputs.is_release == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
