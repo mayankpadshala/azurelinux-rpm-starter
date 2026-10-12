@@ -77,10 +77,9 @@ The repository includes two automated GitHub Actions workflows:
 
 2. **Post-Merge Release (`post-merge.yml`)**:
    - Triggered automatically when code is merged to `main`.
-   - Compiles both binary (`.noarch.rpm`) and source (`.src.rpm`) packages.
-   - Generates SHA256 checksums (`SHA256SUMS`).
-   - Publishes to **GitHub Releases** (providing direct, permanent download links for curl/wget/browser).
-   - Uploads to **GitHub Actions Workflow Artifacts** (persisted for 90 days per run).
+   - Compiles both binary (`.noarch.rpm`) and source (`.src.rpm`) packages and generates SHA256 checksums (`SHA256SUMS`).
+   - **Always uploads to GitHub Actions Workflow Artifacts** (persisted for 90 days with every run).
+   - **Publishes a GitHub Release ONLY when `VERSION` is updated in the PR/merge** (preventing unintentional releases for routine PRs).
 
 ---
 
