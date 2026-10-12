@@ -1,0 +1,64 @@
+name: Post-Merge Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set script permissions
+        run: chmod +x scripts/*.sh
+
+      - name: Extract package version
+        id: version
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          echo "PACKAGE_VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building package version: ${VERSION}"
+
+      - name: Build RPM package
+        run: ./scripts/build.sh "${{ env.PACKAGE_VERSION }}"
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd dist
+          sha256sum *.rpm > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload built RPMs as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurelinux-rpm-v${{ env.PACKAGE_VERSION }}
+          path: dist/*
+          retention-days: 90
+
+      - name: Publish to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${PACKAGE_VERSION}"
+          TITLE="Release ${TAG}"
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists; updating assets..."
+            gh release upload "${TAG}" dist/* --clobber
+          else
+            echo "Creating new release ${TAG}..."
+            gh release create "${TAG}" dist/* \
+              --title "${TITLE}" \
+              --generate-notes
+          fi

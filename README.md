@@ -22,7 +22,9 @@ A cross-platform template to build, version, and lifecycle-test RPM packages tar
 ## Repository Structure
 
 ```text
-├── .github/workflows/ci.yml    # GitHub Actions CI workflow (Build, test & script validation)
+├── .github/workflows/
+│   ├── pre-merge.yml           # PR check: RPM lifecycle test & script syntax validation
+│   └── post-merge.yml          # Release: build RPM, compute SHA256, publish release & artifacts
 ├── docker/
 │   ├── Dockerfile.builder      # Azure Linux build image with rpm-build toolchain
 │   └── Dockerfile.tester       # Clean Azure Linux runtime for lifecycle testing
@@ -60,6 +62,25 @@ docker run --rm -v "$(pwd)/dist:/rpms:ro" mcr.microsoft.com/azurelinux/base/core
 docker run --rm -v "$(pwd)/dist:/rpms:ro" mcr.microsoft.com/azurelinux/base/core:3.0 \
   rpm -qip /rpms/hello-azurelinux-1.0.0-1.azl3.noarch.rpm
 ```
+
+---
+
+## CI/CD Workflows & Downloading Built Packages
+
+The repository includes two automated GitHub Actions workflows:
+
+1. **Pre-Merge Validation (`pre-merge.yml`)**:
+   - Triggered on all pull requests targeting `main`.
+   - Runs the full 5-stage lifecycle tests (`scripts/test-lifecycle.sh`: install → execute → upgrade → verify → remove) inside Azure Linux 3.0.
+   - Validates PowerShell scripts syntax using `pwsh` AST parsing.
+   - Gating check that must pass before merging.
+
+2. **Post-Merge Release (`post-merge.yml`)**:
+   - Triggered automatically when code is merged to `main`.
+   - Compiles both binary (`.noarch.rpm`) and source (`.src.rpm`) packages.
+   - Generates SHA256 checksums (`SHA256SUMS`).
+   - Publishes to **GitHub Releases** (providing direct, permanent download links for curl/wget/browser).
+   - Uploads to **GitHub Actions Workflow Artifacts** (persisted for 90 days per run).
 
 ---
 

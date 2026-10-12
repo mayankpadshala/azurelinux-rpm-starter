@@ -1,14 +1,17 @@
-name: CI
+name: Pre-Merge Validation
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pre-merge-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build & Test (Azure Linux RPM)
+  test-lifecycle:
+    name: RPM Lifecycle Tests (Azure Linux 3.0)
     runs-on: ubuntu-latest
 
     steps:
@@ -18,18 +21,8 @@ jobs:
       - name: Set script permissions
         run: chmod +x scripts/*.sh
 
-      - name: Build RPM package
-        run: ./scripts/build.sh
-
       - name: Run lifecycle tests
         run: ./scripts/test-lifecycle.sh
-
-      - name: Upload built RPMs
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rpms
-          path: dist/*.rpm
 
   validate-scripts:
     name: Validate PowerShell Scripts
