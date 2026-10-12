@@ -46,7 +46,7 @@ $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 
 # Read version from the VERSION file if not provided via parameter.
 if (-not $Version) {
-    $Version = (Get-Content "$RepoRoot\VERSION" -Raw).Trim()
+    $Version = (Get-Content (Join-Path $RepoRoot "VERSION") -Raw).Trim()
 }
 
 # Package name — must match the Name: field in the RPM spec.
@@ -60,8 +60,9 @@ Write-Host "==> Building RPM: version=${Version}, release=${Release}..."
 # Step 1: Build the Docker image.
 # The Dockerfile.builder runs rpmbuild at image-build time, so the
 # resulting image already contains the finished RPMs in /output/.
+$Dockerfile = Join-Path $RepoRoot "docker/Dockerfile.builder"
 docker build `
-    -f "$RepoRoot\docker\Dockerfile.builder" `
+    -f $Dockerfile `
     --build-arg "NAME=$Name" `
     --build-arg "VERSION=$Version" `
     --build-arg "RELEASE=$Release" `
@@ -73,10 +74,11 @@ if ($LASTEXITCODE -ne 0) { throw "Docker build failed." }
 # Step 2: Extract RPMs from the image.
 # We create a stopped container (no CMD needed), copy /output/ contents
 # to the host, then remove the container.
-New-Item -ItemType Directory -Force -Path "$RepoRoot\dist" | Out-Null
+$DistDir = Join-Path $RepoRoot "dist"
+New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 $ContainerId = (docker create $ImageTag).Trim()
-docker cp "${ContainerId}:/output/." "$RepoRoot\dist\"
+docker cp "${ContainerId}:/output/." $DistDir
 docker rm $ContainerId | Out-Null
 
-Write-Host "==> Build complete. Packages written to dist\"
-Get-ChildItem "$RepoRoot\dist\*.rpm" | ForEach-Object { Write-Host $_.Name }
+Write-Host "==> Build complete. Packages written to dist"
+Get-ChildItem (Join-Path $DistDir "*.rpm") | ForEach-Object { Write-Host $_.Name }

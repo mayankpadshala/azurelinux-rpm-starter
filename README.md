@@ -22,7 +22,7 @@ A cross-platform template to build, version, and lifecycle-test RPM packages tar
 ## Repository Structure
 
 ```text
-├── .github/workflows/ci.yml    # GitHub Actions CI matrix (Ubuntu & Windows)
+├── .github/workflows/ci.yml    # GitHub Actions CI workflow (Build, test & script validation)
 ├── docker/
 │   ├── Dockerfile.builder      # Azure Linux build image with rpm-build toolchain
 │   └── Dockerfile.tester       # Clean Azure Linux runtime for lifecycle testing
@@ -83,6 +83,7 @@ To adapt this template for your own project:
 | `Cannot connect to Docker` | Docker daemon is stopped. | Start Docker Desktop or the system Docker service. |
 | `Permission denied` on `.sh` | Missing execute permission in Git. | Run `chmod +x scripts/*.sh` and `git update-index --chmod=+x scripts/*.sh`. |
 | Architecture mismatch | Package contains architecture-specific code. | Change `BuildArch: noarch` to target arch, or pass `--platform linux/amd64` to Docker. |
+| `image operating system "linux" cannot be used` | Docker on Windows is in Windows container mode. | Switch Docker Desktop to Linux containers (Settings → General → Use the WSL 2 based engine). |
 
 ---
 

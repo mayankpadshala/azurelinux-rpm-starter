@@ -65,19 +65,22 @@ $TesterImage = "${Name}-tester:latest"
 # cause a terminating error thanks to $ErrorActionPreference = "Stop".
 Write-Host "=== Phase 1: Build baseline and upgrade RPMs ==="
 
+$BuildScript = Join-Path $RepoRoot "scripts/build.ps1"
+
 Write-Host "==> Building RPM: version=${BaseVersion}, release=${Release}..."
-& "$RepoRoot\scripts\build.ps1" -Version $BaseVersion -Release $Release *> $null
+& $BuildScript -Version $BaseVersion -Release $Release *> $null
 
 Write-Host "==> Building RPM: version=${UpgradeVersion}, release=${Release}..."
-& "$RepoRoot\scripts\build.ps1" -Version $UpgradeVersion -Release $Release *> $null
+& $BuildScript -Version $UpgradeVersion -Release $Release *> $null
 
 # ── Phase 2: Build tester image ──────────────────────────────────────
 # Builds a clean Azure Linux 3.0 image (no dev tools) to simulate
 # a production-like target environment.
 Write-Host "=== Phase 2: Build tester image ==="
+$TesterDockerfile = Join-Path $RepoRoot "docker/Dockerfile.tester"
 
 docker build `
-    -f "$RepoRoot\docker\Dockerfile.tester" `
+    -f $TesterDockerfile `
     -t $TesterImage `
     $RepoRoot *> $null
 
@@ -151,8 +154,9 @@ $TestScript = $TestScript.Replace("__RELEASE__", $Release)
 $TestScript = $TestScript.Replace("__NAME__", $Name)
 
 # Run the test script inside an ephemeral Azure Linux container.
+$DistDir = Join-Path $RepoRoot "dist"
 docker run --rm `
-    -v "${RepoRoot}\dist:/rpms:ro" `
+    -v "${DistDir}:/rpms:ro" `
     $TesterImage `
     /bin/bash -c $TestScript
 

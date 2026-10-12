@@ -8,36 +8,47 @@ on:
 
 jobs:
   build-and-test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            build_script: ./scripts/build.sh
-            test_script: ./scripts/test-lifecycle.sh
-          - os: windows-latest
-            build_script: .\scripts\build.ps1
-            test_script: .\scripts\test-lifecycle.ps1
-
-    runs-on: ${{ matrix.os }}
+    name: Build & Test (Azure Linux RPM)
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set script permissions (Linux)
-        if: runner.os == 'Linux'
+      - name: Set script permissions
         run: chmod +x scripts/*.sh
 
       - name: Build RPM package
-        run: ${{ matrix.build_script }}
+        run: ./scripts/build.sh
 
       - name: Run lifecycle tests
-        run: ${{ matrix.test_script }}
+        run: ./scripts/test-lifecycle.sh
 
       - name: Upload built RPMs
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: rpms-${{ matrix.os }}
+          name: rpms
           path: dist/*.rpm
+
+  validate-scripts:
+    name: Validate PowerShell Scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Lint and syntax-check PowerShell scripts
+        shell: pwsh
+        run: |
+          $scripts = Get-ChildItem -Path scripts/*.ps1
+          foreach ($script in $scripts) {
+              $errors = @()
+              [System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$null, [ref]$errors)
+              if ($errors) {
+                  Write-Error "Syntax error in $($script.FullName): $($errors)"
+                  exit 1
+              }
+              Write-Host "✓ $($script.Name) syntax is valid"
+          }
